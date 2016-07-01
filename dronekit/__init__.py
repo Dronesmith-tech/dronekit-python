@@ -840,6 +840,176 @@ class Channels(dict):
         self._overrides._active = True
         self._overrides._send()
 
+"""
+RGBLED API
+"""
+class RGBLED(object):
+
+    RGBLED_COMMAND = 4000
+
+    # ops
+    RGBLED_OP_SET_RGB_COLOR = 0
+    RGBLED_OP_SET_PREDEFINED_COLOR = 1
+    RGBLED_OP_SET_MODE = 2
+    RGBLED_OP_SET_TEST = 3
+    RGBLED_OP_SET_DEFAULT = 4
+
+    # Colors
+    RGBLED_COLOR_OFF = 0
+    RGBLED_COLOR_RED = 1
+    RGBLED_COLOR_YELLOW = 2
+    RGBLED_COLOR_PURPLE = 3
+    RGBLED_COLOR_GREEN = 4
+    RGBLED_COLOR_BLUE = 5
+    RGBLED_COLOR_WHITE = 6
+    RGBLED_COLOR_AMBER = 7
+    RGBLED_COLOR_DIM_RED = 8
+    RGBLED_COLOR_DIM_YELLOW = 9
+    RGBLED_COLOR_DIM_PURPLE = 10
+    RGBLED_COLOR_DIM_GREEN = 11
+    RGBLED_COLOR_DIM_BLUE = 12
+    RGBLED_COLOR_DIM_WHITE = 13
+    RGBLED_COLOR_DIM_AMBER = 14
+
+    # modes
+    RGBLED_MODE_OFF = 0
+    RGBLED_MODE_ON = 1
+    RGBLED_MODE_BLINK_SLOW = 2
+    RGBLED_MODE_BLINK_NORMAL = 3
+    RGBLED_MODE_BLINK_FAST = 4
+    RGBLED_MODE_BREATHE = 5
+    RGBLED_MODE_RAINBOW = 6
+    RGBLED_MODE_PATTERN = 7
+
+    """
+    """
+    def __init__(self, vehicle):
+        super(RGBLED, self).__init__()
+
+        self.patterns = {}
+        self.patternRunner = None
+
+        self._userMode = "None"
+        self._ledMode = "None"
+        self._vehicle = vehicle
+        self.setDefault()
+
+    """
+    """
+    def setDefault(self, color=3):
+        msg = self._vehicle.message_factory.command_long_encode(
+            0, 0, self.RGBLED_COMMAND, 0,
+            self.RGBLED_OP_SET_DEFAULT,
+            0, 0, 0, 0, 0, 0)
+        self._vehicle.send_mavlink(msg)
+
+    """
+    """
+    def color(self, color=()):
+        if isinstance(color, tuple):
+            red, green, blue = color
+            clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
+            clamp(red, 0.0, 1.0)
+            clamp(green, 0.0, 1.0)
+            clamp(blue, 0.0, 1.0)
+
+            msg = self._vehicle.message_factory.command_long_encode(
+                0, 0, self.RGBLED_COMMAND, 0,
+                self.RGBLED_OP_SET_RGB_COLOR,
+                red,
+                green,
+                blue,
+                0, 0, 0)
+            self._vehicle.send_mavlink(msg)
+        elif isinstance(color, int):
+            if color > 14 or color < 0:
+                raise APIException('Not a valid color: ' + str(color))
+
+            msg = self._vehicle.message_factory.command_long_encode(
+                0, 0, self.RGBLED_COMMAND, 0,
+                self.RGBLED_OP_SET_PREDEFINED_COLOR,
+                color,
+                0, 0, 0, 0, 0)
+            self._vehicle.send_mavlink(msg)
+        else:
+            raise APIException('Not a valid color: ' + str(color))
+
+    """
+    """
+    def mode(self, mode):
+        if mode > 7 or mode < 0:
+            raise APIException('Not a valid mode: ' + str(mode))
+        msg = self._vehicle.message_factory.command_long_encode(
+            0, 0, self.RGBLED_COMMAND, 0,
+            self.RGBLED_OP_SET_MODE,
+            mode,
+            0, 0, 0, 0, 0)
+        self._vehicle.send_mavlink(msg)
+
+    """
+    """
+    def off(self):
+        self.mode(self.RGBLED_MODE_OFF)
+
+    """
+    """
+    def on(self):
+        self.mode(self.RGBLED_MODE_ON)
+
+    """
+    """
+    def pulse(self):
+        self.mode(self.RGBLED_MODE_BREATHE)
+
+    """
+    """
+    def rainbow(self):
+        self.mode(self.RGBLED_MODE_RAINBOW)
+
+    """
+    """
+    def test(self):
+        msg = self._vehicle.message_factory.command_long_encode(
+            0, 0, self.RGBLED_COMMAND, 0,
+            self.RGBLED_OP_SET_TEST,
+            0, 0, 0, 0, 0, 0)
+        self._vehicle.send_mavlink(msg)
+
+    """
+    """
+    def makePattern(self, name, pattern):
+        self.patterns[name] = pattern
+
+    """
+    """
+    def removePattern(self, name):
+        del self.patterns[name]
+
+    """
+    """
+    def launchPattern(self, name, loop=False):
+        pattern = self.patterns[name]
+
+        if pattern == None:
+            raise APIException('Pattern not found: %s' % name)
+            return
+
+        if self.patternRunner != None and not self.patternRunner.done():
+            self.patternRunner.join()
+
+        self.patternRunner = Thread(target=self.patternThread, args=(pattern,loop,))
+        self.patternRunner.daemon = True
+        self.patternRunner.start();
+
+    """
+    """
+    def patternThread(self, pattern, loop):
+        while True:
+            for p in pattern:
+                self.color(p[0])
+                time.sleep(p[1])
+            if loop is False:
+                return
 
 class Locations(HasObservers):
     """
@@ -1100,6 +1270,9 @@ class Vehicle(HasObservers):
         # gimbal
         self._gimbal = Gimbal(self)
 
+        # rgbled
+        self._rgbled = RGBLED(self)
+
         # All keys are strings.
         self._channels = Channels(self, 8)
 
@@ -1177,9 +1350,13 @@ class Vehicle(HasObservers):
             self.notify_attribute_listeners('armed', self.armed, cache=True)
             self._autopilot_type = m.autopilot
             self._vehicle_type = m.type
-            if self._is_mode_available(m.custom_mode) == False:
-                raise APIException("mode %s not available on mavlink definition" % m.custom_mode)
-            self._flightmode = self._mode_mapping_bynumber[m.custom_mode]
+            # if self._is_mode_available(m.custom_mode) == False:
+            #     raise APIException("mode %s not available on mavlink definition" % m.custom_mode)
+            # self._flightmode = self._mode_mapping_bynumber[m.custom_mode]
+
+            # PX4 fix
+            if m.custom_mode != 65536:
+                self._flightmode = {v: k for k, v in self._master.mode_mapping().items()}[m.custom_mode]
             self.notify_attribute_listeners('mode', self.mode, cache=True)
             self._system_status = m.system_status
             self.notify_attribute_listeners('system_status', self.system_status, cache=True)
