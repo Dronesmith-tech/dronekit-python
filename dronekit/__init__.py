@@ -1178,7 +1178,7 @@ class Vehicle(HasObservers):
         self._ready_attrs = set(['commands'])
 
         # Default parameters when calling wait_ready() or wait_ready(True).
-        self._default_ready_attrs = ['parameters', 'gps_0', 'armed', 'mode', 'attitude']
+        self._default_ready_attrs = ['parameters', 'armed', 'mode', 'attitude']
 
         @self.on_attribute('*')
         def listener(_, name, value):
