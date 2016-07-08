@@ -845,7 +845,7 @@ RGBLED API
 """
 class RGBLED(object):
 
-    RGBLED_COMMAND = 4000
+    RGBLED_COMMAND = 5000
 
     # ops
     RGBLED_OP_SET_RGB_COLOR = 0
@@ -878,8 +878,7 @@ class RGBLED(object):
     RGBLED_MODE_BLINK_NORMAL = 3
     RGBLED_MODE_BLINK_FAST = 4
     RGBLED_MODE_BREATHE = 5
-    RGBLED_MODE_RAINBOW = 6
-    RGBLED_MODE_PATTERN = 7
+    RGBLED_MODE_PATTERN = 6
 
     """
     """
@@ -960,11 +959,6 @@ class RGBLED(object):
     """
     def pulse(self):
         self.mode(self.RGBLED_MODE_BREATHE)
-
-    """
-    """
-    def rainbow(self):
-        self.mode(self.RGBLED_MODE_RAINBOW)
 
     """
     """
