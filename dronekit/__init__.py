@@ -936,7 +936,7 @@ class RGBLED(object):
     """
     """
     def mode(self, mode):
-        if mode > 7 or mode < 0:
+        if mode > 6 or mode < 0:
             raise APIException('Not a valid mode: ' + str(mode))
         msg = self._vehicle.message_factory.command_long_encode(
             0, 0, self.RGBLED_COMMAND, 0,
