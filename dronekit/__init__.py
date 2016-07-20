@@ -38,6 +38,8 @@ import sys
 import os
 import platform
 import re
+import requests
+import json
 from dronekit.util import errprinter
 from pymavlink import mavutil, mavwp
 from Queue import Queue, Empty
@@ -49,6 +51,8 @@ import copy
 import collections
 from pymavlink.dialects.v10 import ardupilotmega
 
+DSLINK_API = 'http://localhost:8080/api/'
+RUNNING_IP = ''
 
 class APIException(Exception):
     """
@@ -1265,7 +1269,7 @@ class Vehicle(HasObservers):
         self._gimbal = Gimbal(self)
 
         # rgbled
-        self._rgbled = RGBLED(self)
+        # self._rgbled = RGBLED(self)
 
         # All keys are strings.
         self._channels = Channels(self, 8)
@@ -1661,8 +1665,40 @@ class Vehicle(HasObservers):
                            msg.get_type())
                 errprinter('>>> ' + str(e))
 
+    def sensor(self, name, value):
+        url = DSLINK_API + 'sensor'
+        headers = { 'Content-Type': 'application/json' }
+        payload = {
+            'kind': name,
+            'data': float(value)
+        }
+
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+
+        # print('Status code:', response)
+        #
+        # jsonText = json.loads(response.text)
+        # print('Text:', jsonText)
 
     def close(self):
+        global RUNNING_IP
+        url = DSLINK_API + 'output'
+        headers = { 'Content-Type': 'application/json' }
+
+        # print(RUNNING_IP)
+
+        payload = {
+            'Method': 'delete',
+            'Address': '0.0.0.0:14551'
+        }
+
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+
+        # print('Status code:', response)
+        #
+        # jsonText = json.loads(response.text)
+        # print('Text:', jsonText)
+
         return self._handler.close()
 
     def flush(self):
@@ -2968,8 +3004,28 @@ def connect(ip,
     :returns: A connected vehicle of the type defined in ``vehicle_class`` (a superclass of :py:class:`Vehicle`).
     """
 
+    global RUNNING_IP
+
     if not vehicle_class:
         vehicle_class = Vehicle
+
+    RUNNING_IP = ip
+
+    url = DSLINK_API + 'output'
+    headers = { 'Content-Type': 'application/json' }
+
+    response = requests.get(url, headers=headers)
+
+    payload = {
+        'Address': ip
+    }
+
+    response = requests.post(url, data=json.dumps(payload), headers=headers)
+
+    # print('Status code:', response)
+    #
+    # jsonText = json.loads(response.text)
+    # print('Text:', jsonText)
 
     handler = MAVConnection(ip, baud=baud, source_system=source_system, use_native=use_native)
     vehicle = vehicle_class(handler)
