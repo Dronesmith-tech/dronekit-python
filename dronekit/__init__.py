@@ -1353,8 +1353,8 @@ class Vehicle(HasObservers):
             # self._flightmode = self._mode_mapping_bynumber[m.custom_mode]
 
             # PX4 fix
-            if m.custom_mode != 65536:
-                self._flightmode = {v: k for k, v in self._master.mode_mapping().items()}[m.custom_mode]
+            # if m.custom_mode != 65536:
+                # self._flightmode = {v: k for k, v in self._master.mode_mapping().items()}[m.custom_mode]
             self.notify_attribute_listeners('mode', self.mode, cache=True)
             self._system_status = m.system_status
             self.notify_attribute_listeners('system_status', self.system_status, cache=True)
@@ -1748,7 +1748,7 @@ class Vehicle(HasObservers):
 
     @mode.setter
     def mode(self, v):
-        self._master.set_mode(self._mode_mapping[v.name])
+        self._master.set_mode(self._mode_mapping[v])
 
     @property
     def location(self):
