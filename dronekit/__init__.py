@@ -51,7 +51,7 @@ import copy
 import collections
 from pymavlink.dialects.v10 import ardupilotmega
 
-DSLINK_API = 'http://localhost:8080/api/'
+DSLINK_API = 'http://localhost:80/api/'
 RUNNING_IP = ''
 
 class APIException(Exception):
